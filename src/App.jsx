@@ -12,21 +12,42 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Load Leaflet.heat plugin
-const loadHeatmapPlugin = () => {
-  return new Promise((resolve, reject) => {
+// Load Leaflet.heat plugin with better error handling and caching
+const loadHeatmapPlugin = (() => {
+  let loadPromise = null;
+  
+  return () => {
+    if (loadPromise) return loadPromise;
+    
     if (window.L && window.L.heatLayer) {
-      resolve();
-      return;
+      loadPromise = Promise.resolve();
+      return loadPromise;
     }
     
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js';
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load heatmap plugin'));
-    document.head.appendChild(script);
-  });
-};
+    loadPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js';
+      script.crossOrigin = '';
+      
+      script.onload = () => {
+        if (window.L && window.L.heatLayer) {
+          resolve();
+        } else {
+          reject(new Error('Heatmap plugin failed to initialize'));
+        }
+      };
+      
+      script.onerror = () => {
+        loadPromise = null; // Reset promise on error
+        reject(new Error('Failed to load heatmap plugin'));
+      };
+      
+      document.head.appendChild(script);
+    });
+    
+    return loadPromise;
+  };
+})();
 
 const testInternetSpeed = async () => {
   try {
