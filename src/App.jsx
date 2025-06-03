@@ -51,8 +51,7 @@ const loadHeatmapPlugin = (() => {
 
 const testInternetSpeed = async () => {
   try {
-    // Use a more reliable speed test approach
-    const testFile = "https://speed.cloudflare.com/__down?bytes=10000000"; // 10MB from Cloudflare
+    const testFile = "https://speed.cloudflare.com/__down?bytes=10000000";
     const startTime = performance.now();
     
     const response = await fetch(testFile, {
@@ -67,25 +66,14 @@ const testInternetSpeed = async () => {
     await response.blob();
     const endTime = performance.now();
     
-    const duration = (endTime - startTime) / 1000; // seconds
-    const fileSizeInBits = 10 * 1024 * 1024 * 8; // 10MB in bits
-    const speedMbps = (fileSizeInBits / duration / 1024 / 1024); // Mbps
+    const duration = (endTime - startTime) / 1000;
+    const fileSizeInBits = 10 * 1024 * 1024 * 8;
+    const speedMbps = (fileSizeInBits / duration) / (1024 * 1024);
     
-    return Math.max(0.1, Number(speedMbps.toFixed(2))); // Ensure minimum speed
+    return Math.max(0.1, Number(speedMbps.toFixed(2)));
   } catch (error) {
     console.error('Speed test failed:', error);
-    // Return a fallback speed test using a smaller file
-    try {
-      const startTime = performance.now();
-      await fetch('https://httpbin.org/bytes/1000000', { cache: 'no-cache' }); // 1MB fallback
-      const endTime = performance.now();
-      const duration = (endTime - startTime) / 1000;
-      const speedMbps = (1 * 8 / duration); // 1MB in Mbps
-      return Math.max(0.1, Number(speedMbps.toFixed(2)));
-    } catch (fallbackError) {
-      console.error('Fallback speed test also failed:', fallbackError);
-      return 0.1; // Return very low speed if all tests fail
-    }
+    return 0.1;
   }
 };
 
@@ -109,7 +97,7 @@ const getLocation = () =>
       { 
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000 // 5 minutes
+        maximumAge: 300000
       }
     );
   });
@@ -175,7 +163,6 @@ const CustomMarker = ({ log, index }) => {
   );
 };
 
-// Heatmap component
 const HeatmapLayer = ({ logs, map }) => {
   const heatLayerRef = useRef(null);
 
@@ -186,34 +173,29 @@ const HeatmapLayer = ({ logs, map }) => {
       try {
         await loadHeatmapPlugin();
         
-        // Remove existing heatmap layer
         if (heatLayerRef.current) {
           map.removeLayer(heatLayerRef.current);
         }
 
-        // Prepare heatmap data: [lat, lng, intensity]
         const heatmapData = logs.map(log => {
-          // Normalize speed to 0-1 range for better heatmap visualization
-          // Use logarithmic scale for better visual distribution
-          let intensity = Math.log(log.speed + 1) / Math.log(100); // log scale up to ~100 Mbps
-          intensity = Math.min(1, Math.max(0.1, intensity)); // Clamp between 0.1 and 1
+          let intensity = Math.log(log.speed + 1) / Math.log(100);
+          intensity = Math.min(1, Math.max(0.1, intensity));
           
           return [log.lat, log.lon, intensity];
         });
 
-        // Create heatmap layer
         const heatLayer = L.heatLayer(heatmapData, {
           radius: 25,
           blur: 15,
           maxZoom: 17,
           max: 1.0,
           gradient: {
-            0.0: '#800026',  // Dark red for dead zones
-            0.2: '#BD0026',  // Red
-            0.4: '#E31A1C',  // Light red
-            0.6: '#FC4E2A',  // Orange-red
-            0.8: '#FD8D3C',  // Orange
-            1.0: '#22c55e'   // Green for excellent zones
+            0.0: '#800026',
+            0.2: '#BD0026',
+            0.4: '#E31A1C',
+            0.6: '#FC4E2A',
+            0.8: '#FD8D3C',
+            1.0: '#22c55e'
           }
         });
 
@@ -227,7 +209,6 @@ const HeatmapLayer = ({ logs, map }) => {
 
     initHeatmap();
 
-    // Cleanup function
     return () => {
       if (heatLayerRef.current && map) {
         map.removeLayer(heatLayerRef.current);
@@ -240,7 +221,7 @@ const HeatmapLayer = ({ logs, map }) => {
 
 const App = () => {
   const [logs, setLogs] = useState([]);
-  const [mapCenter, setMapCenter] = useState([12.9716, 79.1588]); // Default to VIT
+  const [mapCenter, setMapCenter] = useState([12.9716, 79.1588]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [error, setError] = useState(null);
@@ -248,18 +229,17 @@ const App = () => {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [map, setMap] = useState(null);
   
-  // Auto-testing states
   const [isAutoTesting, setIsAutoTesting] = useState(false);
-  const [autoTestInterval, setAutoTestInterval] = useState(5); // minutes
+  const [autoTestInterval, setAutoTestInterval] = useState(5);
   const [nextTestCountdown, setNextTestCountdown] = useState(0);
   const [autoTestCount, setAutoTestCount] = useState(0);
+  const workerRef = useRef(null);
 
   const testSpeed = async (isAutoTest = false) => {
     setIsLoading(true);
     setError(null);
     
     try {
-      console.log(isAutoTest ? 'Auto-testing speed...' : 'Manual testing speed...');
       const location = await getLocation();
       setCurrentLocation(location);
       
@@ -273,23 +253,18 @@ const App = () => {
         accuracy: location.accuracy,
         isAutoTest
       };
-
-      console.log('Speed test result:', log);
       
       const updatedLogs = [...logs, log];
       setLogs(updatedLogs);
       
-      // Save to localStorage
       try {
         localStorage.setItem("deadzone_logs", JSON.stringify(updatedLogs));
       } catch (storageError) {
         console.warn('Failed to save to localStorage:', storageError);
       }
       
-      // Update map center to current location
       setMapCenter([location.lat, location.lon]);
       
-      // Increment auto test counter if it's an auto test
       if (isAutoTest) {
         setAutoTestCount(prev => prev + 1);
       }
@@ -311,16 +286,48 @@ const App = () => {
 
   const toggleAutoTesting = () => {
     if (isAutoTesting) {
-      // Stop auto testing
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
       setIsAutoTesting(false);
       setNextTestCountdown(0);
     } else {
-      // Start auto testing
+      const worker = new Worker(new URL('./speedWorker.js', import.meta.url));
+      
+      worker.onmessage = async (e) => {
+        if (e.data.type === 'speedResult') {
+          const location = await getLocation();
+          const log = {
+            lat: location.lat,
+            lon: location.lon,
+            speed: e.data.speed,
+            timestamp: new Date().toISOString(),
+            accuracy: location.accuracy,
+            isAutoTest: true
+          };
+          
+          setLogs(prev => {
+            const updated = [...prev, log];
+            try {
+              localStorage.setItem("deadzone_logs", JSON.stringify(updated));
+            } catch (error) {
+              console.warn('Failed to save to localStorage:', error);
+            }
+            return updated;
+          });
+          
+          setAutoTestCount(prev => prev + 1);
+          setMapCenter([location.lat, location.lon]);
+        }
+      };
+      
+      worker.postMessage({ interval: autoTestInterval });
+      workerRef.current = worker;
+      
       setIsAutoTesting(true);
-      setNextTestCountdown(autoTestInterval * 60); // Convert minutes to seconds
+      setNextTestCountdown(autoTestInterval * 60);
       setAutoTestCount(0);
-      // Run first test immediately
-      testSpeed(true);
     }
   };
 
@@ -350,7 +357,6 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Calculate stats
   const getStats = () => {
     if (logs.length === 0) return null;
     
@@ -364,7 +370,7 @@ const App = () => {
     const goodZones = logs.filter(log => log.speed > 10 && log.speed <= 50).length;
     const excellentZones = logs.filter(log => log.speed > 50).length;
     
-    const recentTests = logs.slice(-5); // Last 5 tests
+    const recentTests = logs.slice(-5);
     const trend = recentTests.length >= 2 ? 
       (recentTests[recentTests.length - 1].speed - recentTests[0].speed) : 0;
     
@@ -388,14 +394,12 @@ const App = () => {
   };
 
   useEffect(() => {
-    // Load saved logs on startup
     try {
       const savedLogs = localStorage.getItem("deadzone_logs");
       if (savedLogs) {
         const parsedLogs = JSON.parse(savedLogs);
         setLogs(parsedLogs);
         
-        // Set map center to last logged location
         if (parsedLogs.length > 0) {
           const lastLog = parsedLogs[parsedLogs.length - 1];
           setMapCenter([lastLog.lat, lastLog.lon]);
@@ -404,9 +408,15 @@ const App = () => {
     } catch (error) {
       console.error('Failed to load saved logs:', error);
     }
+    
+    // Cleanup worker on unmount
+    return () => {
+      if (workerRef.current) {
+        workerRef.current.terminate();
+      }
+    };
   }, []);
 
-  // Auto-testing countdown and execution
   useEffect(() => {
     let interval;
     
@@ -414,9 +424,7 @@ const App = () => {
       interval = setInterval(() => {
         setNextTestCountdown(prev => {
           if (prev <= 1) {
-            // Time to run next test
-            testSpeed(true);
-            return autoTestInterval * 60; // Reset countdown
+            return autoTestInterval * 60;
           }
           return prev - 1;
         });
@@ -428,7 +436,6 @@ const App = () => {
     };
   }, [isAutoTesting, nextTestCountdown, autoTestInterval]);
 
-  // Prevent page unload during auto-testing
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (isAutoTesting) {
@@ -492,7 +499,6 @@ const App = () => {
           )}
         </div>
         
-        {/* Heatmap Legend */}
         {showHeatmap && logs.length > 0 && (
           <div className="heatmap-legend">
             <div className="legend-title">🔥 Connectivity Heatmap</div>
@@ -508,7 +514,6 @@ const App = () => {
           </div>
         )}
         
-        {/* Auto-testing controls */}
         <div className="auto-controls">
           <div className="interval-selector">
             <label>Test Interval:</label>
@@ -623,7 +628,7 @@ const App = () => {
           center={mapCenter} 
           zoom={16} 
           style={{ height: "100%", width: "100%" }}
-          key={`${mapCenter[0]}-${mapCenter[1]}`} // Force re-render when center changes
+          key={`${mapCenter[0]}-${mapCenter[1]}`}
           whenCreated={setMap}
         >
           <TileLayer
@@ -631,10 +636,8 @@ const App = () => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          {/* Heatmap Layer */}
           {showHeatmap && <HeatmapLayer logs={logs} map={map} />}
           
-          {/* Markers - only show when heatmap is off or both are desired */}
           {(!showHeatmap || logs.length < 5) && logs.map((log, idx) => (
             <CustomMarker key={`${log.lat}-${log.lon}-${idx}`} log={log} index={idx} />
           ))}
