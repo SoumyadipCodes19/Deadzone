@@ -115,10 +115,10 @@ const getLocation = () =>
   });
 
 const getMarkerColor = (speed) => {
-  if (speed > 25) return '#22c55e'; // Green
-  if (speed > 10) return '#f59e0b'; // Orange
-  if (speed > 1) return '#ef4444';  // Red
-  return '#6b7280'; // Gray for very low/no speed
+  if (speed > 50) return '#22c55e'; // Green for excellent
+  if (speed > 10) return '#f59e0b'; // Orange for good
+  if (speed > 1) return '#ef4444';  // Red for poor
+  return '#6b7280'; // Gray for dead zone
 };
 
 const CustomMarker = ({ log, index }) => {
@@ -157,7 +157,7 @@ const CustomMarker = ({ log, index }) => {
           <br />
           <strong>Speed:</strong> {log.speed} Mbps<br />
           <strong>Quality:</strong> {
-            log.speed > 25 ? '🟢 Excellent' :
+            log.speed > 50 ? '🟢 Excellent' :
             log.speed > 10 ? '🟡 Good' :
             log.speed > 1 ? '🔴 Poor' : '⚫ Dead Zone'
           }<br />
@@ -359,9 +359,10 @@ const App = () => {
     const min = Math.min(...speeds);
     const max = Math.max(...speeds);
     
-    const deadZones = logs.filter(log => log.speed < 1).length;
-    const goodZones = logs.filter(log => log.speed > 10).length;
-    const excellentZones = logs.filter(log => log.speed > 25).length;
+    const deadZones = logs.filter(log => log.speed <= 1).length;
+    const poorZones = logs.filter(log => log.speed > 1 && log.speed <= 10).length;
+    const goodZones = logs.filter(log => log.speed > 10 && log.speed <= 50).length;
+    const excellentZones = logs.filter(log => log.speed > 50).length;
     
     const recentTests = logs.slice(-5); // Last 5 tests
     const trend = recentTests.length >= 2 ? 
@@ -373,11 +374,13 @@ const App = () => {
       min: min.toFixed(1),
       max: max.toFixed(1),
       deadZones,
+      poorZones,
       goodZones,
       excellentZones,
       trend: trend.toFixed(1),
       coverage: {
         dead: ((deadZones / logs.length) * 100).toFixed(0),
+        poor: ((poorZones / logs.length) * 100).toFixed(0),
         good: ((goodZones / logs.length) * 100).toFixed(0),
         excellent: ((excellentZones / logs.length) * 100).toFixed(0)
       }
@@ -567,7 +570,8 @@ const App = () => {
                 <div className="stat-values">
                   <span className="excellent">🟢 {stats.excellentZones} Excellent</span>
                   <span className="good">🟡 {stats.goodZones} Good</span>
-                  <span className="dead">🔴 {stats.deadZones} Dead</span>
+                  <span className="dead">🔴 {stats.poorZones} Poor</span>
+                  <span className="dead">⚫ {stats.deadZones} Dead</span>
                 </div>
               </div>
             </div>
@@ -579,7 +583,8 @@ const App = () => {
                 <div className="stat-values">
                   <span>🟢 {stats.coverage.excellent}% Excellent</span>
                   <span>🟡 {stats.coverage.good}% Good</span>
-                  <span>🔴 {stats.coverage.dead}% Dead</span>
+                  <span>🔴 {stats.coverage.poor}% Poor</span>
+                  <span>⚫ {stats.coverage.dead}% Dead</span>
                 </div>
               </div>
             </div>
