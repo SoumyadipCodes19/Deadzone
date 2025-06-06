@@ -177,6 +177,7 @@
 
 .map-view {
   height: 100%;
+  width: 100%;
   border-radius: var(--border-radius);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
@@ -213,7 +214,7 @@
 .stats-grid {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
+  gap: var(--spacing-4);
 }
 
 .stat-item {
@@ -290,25 +291,24 @@
 
 /* Coverage popup styling */
 .coverage-popup {
-  padding: var(--spacing-3);
+  padding: var(--spacing-2);
 }
 
 .coverage-popup h3 {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
+  margin: 0 0 var(--spacing-2) 0;
+  font-size: var(--font-size-base);
   color: var(--text-primary);
-  margin-bottom: var(--spacing-3);
 }
 
 .coverage-info {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
+  gap: var(--spacing-1);
 }
 
 .coverage-info p {
   margin: 0;
-  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .coverage-info strong {
@@ -359,4 +359,9 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Fix for dark mode tiles */
+.dark-tiles {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%) !important;
 } 
