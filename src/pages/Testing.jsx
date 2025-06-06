@@ -1,248 +1,279 @@
-import React, { useState, useRef, useCallback } from 'react';
-import MapContainer from '../components/map/MapContainer';
-import useMapMarkers from '../hooks/useMapMarkers';
-import useSpeedTest from '../hooks/useSpeedTest';
-import Overlay from 'ol/Overlay';
+import React, { useState, useEffect, useContext } from 'react';
+import TestContext from '../context/TestContext';
+import { useSettings } from '../context/SettingsContext';
+import TestScheduler from '../components/TestScheduler';
+import '../styles/Testing.css';
 
 const Testing = () => {
-  const [logs, setLogs] = useState([]);
-  const [currentLocation, setCurrentLocation] = useState(null);
-  const [selectedMarker, setSelectedMarker] = useState(null);
-  const [selectedStyle, setSelectedStyle] = useState('dark');
-  const [autoTestInterval, setAutoTestInterval] = useState(5);
-  
-  const popupRef = useRef(null);
-  const popupOverlayRef = useRef(null);
-  const mapRef = useRef(null);
+  const { tests, clearTests, runTest, startAutoTest, stopAutoTest, isAutoTesting } = useContext(TestContext);
+  const { autoTestInterval, speedThresholds, notificationsEnabled } = useSettings();
+  const [scheduledTests, setScheduledTests] = useState([]);
+  const [activeSchedules, setActiveSchedules] = useState([]);
 
-  // Initialize map markers hook
-  const {
-    addMarkersToMap,
-    clearMarkers,
-    animateToMarker,
-    getMarkerColor
-  } = useMapMarkers(mapRef.current?.vectorSource);
-
-  // Handle test completion
-  const handleTestComplete = useCallback((testResult) => {
-    const updatedLogs = [...logs, testResult];
-    setLogs(updatedLogs);
-    
-    try {
-      localStorage.setItem("deadzone_logs", JSON.stringify(updatedLogs));
-    } catch (storageError) {
-      console.warn('Failed to save to localStorage:', storageError);
+  useEffect(() => {
+    if (notificationsEnabled && Notification.permission === 'default') {
+      Notification.requestPermission();
     }
-    
-    addMarkersToMap(updatedLogs);
-    
-    if (mapRef.current?.map) {
-      animateToMarker(
-        mapRef.current.map,
-        [testResult.longitude, testResult.latitude],
-        { zoom: 16, duration: 1000 }
-      );
+  }, [notificationsEnabled]);
+
+  useEffect(() => {
+    // Load saved schedules from localStorage
+    const savedSchedules = localStorage.getItem('scheduledTests');
+    if (savedSchedules) {
+      setScheduledTests(JSON.parse(savedSchedules));
     }
-  }, [logs, addMarkersToMap, animateToMarker]);
+  }, []);
 
-  // Initialize speed test hook
-  const {
-    isLoading,
-    error,
-    isAutoTesting,
-    autoTestCount,
-    startAutoTest,
-    stopAutoTest,
-    updateTestInterval,
-    runManualTest
-  } = useSpeedTest(handleTestComplete);
+  useEffect(() => {
+    // Save schedules to localStorage whenever they change
+    localStorage.setItem('scheduledTests', JSON.stringify(scheduledTests));
+  }, [scheduledTests]);
 
-  // Handle map initialization
-  const handleMapReady = useCallback(({ map, vectorSource }) => {
-    mapRef.current = { map, vectorSource };
+  useEffect(() => {
+    // Clear all existing intervals when component unmounts
+    return () => {
+      activeSchedules.forEach(schedule => clearInterval(schedule.intervalId));
+    };
+  }, [activeSchedules]);
 
-    // Initialize popup overlay
-    const popupOverlay = new Overlay({
-      element: popupRef.current,
-      positioning: 'bottom-center',
-      offset: [0, -10],
-      autoPan: true,
-      autoPanAnimation: {
-        duration: 250
+  const handleTestComplete = (testResult) => {
+    if (notificationsEnabled && Notification.permission === 'granted') {
+      const quality = getSpeedQuality(testResult.speed);
+      new Notification('Speed Test Complete', {
+        body: `Speed: ${testResult.speed} Mbps (${quality})`,
+        icon: '/favicon.ico'
+      });
+    }
+  };
+
+  const handleScheduleTest = (schedule) => {
+    const newSchedule = {
+      id: Date.now(),
+      ...schedule,
+      status: 'active'
+    };
+
+    setScheduledTests(prev => [...prev, newSchedule]);
+
+    if (schedule.type === 'recurring') {
+      // Set up recurring test
+      const now = new Date();
+      const targetDay = schedule.config.day;
+      const [hours, minutes] = schedule.config.time.split(':');
+      const targetTime = new Date();
+      targetTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+      // Calculate next occurrence
+      let daysUntilNext = getDayDifference(now.getDay(), getDayNumber(targetDay));
+      if (daysUntilNext === 0 && now > targetTime) {
+        daysUntilNext = 7;
       }
-    });
-    map.addOverlay(popupOverlay);
-    popupOverlayRef.current = popupOverlay;
 
-    // Add click handler for markers
-    map.on('click', (event) => {
-      const feature = map.forEachFeatureAtPixel(event.pixel, feature => feature);
-      if (feature) {
-        const log = feature.get('data');
-        setSelectedMarker(log);
-        popupOverlay.setPosition(feature.getGeometry().getCoordinates());
-      } else {
-        setSelectedMarker(null);
-        popupOverlay.setPosition(undefined);
+      const firstRun = new Date(targetTime);
+      firstRun.setDate(firstRun.getDate() + daysUntilNext);
+
+      const timeUntilFirst = firstRun - now;
+
+      // Schedule first occurrence
+      const timeoutId = setTimeout(() => {
+        runTest();
+        // Set up weekly interval after first run
+        const intervalId = setInterval(runTest, 7 * 24 * 60 * 60 * 1000);
+        setActiveSchedules(prev => [...prev, { id: newSchedule.id, intervalId }]);
+      }, timeUntilFirst);
+
+      setActiveSchedules(prev => [...prev, { id: newSchedule.id, timeoutId }]);
+    } else {
+      // Set up one-time test
+      const targetDate = new Date(`${schedule.config.date}T${schedule.config.time}`);
+      const timeUntilTest = targetDate - new Date();
+
+      if (timeUntilTest > 0) {
+        const timeoutId = setTimeout(() => {
+          runTest();
+          // Remove one-time schedule after execution
+          setScheduledTests(prev => prev.filter(s => s.id !== newSchedule.id));
+        }, timeUntilTest);
+
+        setActiveSchedules(prev => [...prev, { id: newSchedule.id, timeoutId }]);
       }
-    });
-
-    // Load saved logs
-    try {
-      const savedLogs = localStorage.getItem("deadzone_logs");
-      if (savedLogs) {
-        const parsedLogs = JSON.parse(savedLogs);
-        setLogs(parsedLogs);
-        addMarkersToMap(parsedLogs);
-        
-        if (parsedLogs.length > 0) {
-          const lastLog = parsedLogs[parsedLogs.length - 1];
-          animateToMarker(
-            map,
-            [lastLog.longitude, lastLog.latitude],
-            { zoom: 16, duration: 0 }
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load saved logs:', error);
     }
-  }, [addMarkersToMap, animateToMarker]);
+  };
 
-  // Handle interval change
-  const handleIntervalChange = useCallback((newInterval) => {
-    setAutoTestInterval(newInterval);
-    updateTestInterval(newInterval * 60 * 1000); // Convert minutes to milliseconds
-  }, [updateTestInterval]);
+  const handleAutoTest = (intervalMinutes) => {
+    const intervalMs = intervalMinutes;
+    startAutoTest(intervalMs);
+  };
 
-  // Handle clear logs
-  const clearLogs = useCallback(() => {
-    setLogs([]);
-    localStorage.removeItem("deadzone_logs");
-    clearMarkers();
-    setSelectedMarker(null);
-    if (popupOverlayRef.current) {
-      popupOverlayRef.current.setPosition(undefined);
+  const handleStopAutoTest = () => {
+    stopAutoTest();
+  };
+
+  const handleClearSchedule = (scheduleId) => {
+    // Clear the associated timeout/interval
+    const schedule = activeSchedules.find(s => s.id === scheduleId);
+    if (schedule) {
+      if (schedule.timeoutId) clearTimeout(schedule.timeoutId);
+      if (schedule.intervalId) clearInterval(schedule.intervalId);
     }
-  }, [clearMarkers]);
+
+    // Remove from active schedules
+    setActiveSchedules(prev => prev.filter(s => s.id !== scheduleId));
+    // Remove from scheduled tests
+    setScheduledTests(prev => prev.filter(s => s.id !== scheduleId));
+  };
+
+  const handleClearLogs = () => {
+    clearTests();
+  };
 
   return (
     <div className="testing-page">
-      <header className="header">
-        <h1>🛰️ Speed Testing</h1>
-        <div className="stats">
-          <span>📍 Tests: {logs.length}</span>
-          {autoTestCount > 0 && <span>🤖 Auto: {autoTestCount}</span>}
-        </div>
-        <div className="controls">
-          <button 
-            onClick={runManualTest} 
-            disabled={isLoading}
-            className={isLoading ? 'loading' : ''}
-          >
-            {isLoading ? '🔄 Testing...' : '🚀 Test Now'}
-          </button>
-          
-          <button 
-            onClick={() => isAutoTesting ? stopAutoTest() : startAutoTest(autoTestInterval * 60 * 1000)}
-            className={isAutoTesting ? 'auto-active' : 'auto-inactive'}
-            disabled={isLoading}
-          >
-            {isAutoTesting ? '⏹️ Stop Auto' : '🤖 Start Auto'}
-          </button>
-          
-          <button onClick={clearLogs} className="clear-btn">🗑️ Clear All</button>
-
-          <select 
-            value={selectedStyle} 
-            onChange={(e) => setSelectedStyle(e.target.value)}
-            className="map-style-select"
-          >
-            <option value="dark">🌙 Dark</option>
-            <option value="streets">🗺️ Streets</option>
-            <option value="satellite">🛸 Satellite</option>
-          </select>
-        </div>
-        
-        <div className="auto-controls">
-          <div className="interval-selector">
-            <label>Test Interval:</label>
-            <select 
-              value={autoTestInterval} 
-              onChange={(e) => handleIntervalChange(Number(e.target.value))}
+      <div className="testing-header">
+        <div className="flex justify-between items-center">
+          <h1>Network Testing</h1>
+          <div className="testing-controls">
+            <button 
+              className="btn btn-primary"
+              onClick={runTest}
               disabled={isAutoTesting}
             >
-              <option value={1}>1 minute</option>
-              <option value={2}>2 minutes</option>
-              <option value={5}>5 minutes</option>
-              <option value={10}>10 minutes</option>
-              <option value={15}>15 minutes</option>
-            </select>
+              🚀 Run Test
+            </button>
+            {isAutoTesting && (
+              <button 
+                className="btn btn-danger"
+                onClick={handleStopAutoTest}
+              >
+                ⏹️ Stop Auto Test
+              </button>
+            )}
+            <button 
+              className="btn btn-danger"
+              onClick={handleClearLogs}
+              disabled={tests.length === 0}
+            >
+              🗑️ Clear Tests
+            </button>
           </div>
-          
-          {isAutoTesting && (
-            <div className="auto-status">
-              <span className="status-indicator">
-                <div className="status-dot active"></div>
-                Auto-testing active
-              </span>
-            </div>
-          )}
         </div>
-        {error && <div className="error">❌ {error}</div>}
-        {currentLocation && (
-          <div className="location-info">
-            📍 Current: {currentLocation.lat.toFixed(4)}, {currentLocation.lon.toFixed(4)}
-            {currentLocation.accuracy && ` (±${Math.round(currentLocation.accuracy)}m)`}
+      </div>
+
+      <div className="testing-grid">
+        <div className="flex flex-col gap-6">
+          <div className="test-status">
+            <h3>Current Status</h3>
+            {tests.length === 0 ? (
+              <div className="no-test">
+                <p>No tests run yet</p>
+                <p>Click "Run Test" to start</p>
+              </div>
+            ) : (
+              <div className="test-details">
+                <div className="speed-value">
+                  {tests[tests.length - 1].speed.toFixed(2)} Mbps
+                </div>
+                <div className="test-time">
+                  {new Date(tests[tests.length - 1].timestamp).toLocaleString()}
+                </div>
+                <div className="test-location">
+                  📍 {tests[tests.length - 1].location.lat.toFixed(6)}, 
+                  {tests[tests.length - 1].location.lng.toFixed(6)}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </header>
-      
-      <div className="map-wrapper">
-        <MapContainer
-          selectedStyle={selectedStyle}
-          onMapReady={handleMapReady}
-          className="ol-map"
-        />
-        <div 
-          ref={popupRef} 
-          className="ol-popup"
-          style={{ display: selectedMarker ? 'block' : 'none' }}
-        >
-          {selectedMarker && (
-            <div>
-              <a 
-                href="#" 
-                className="ol-popup-closer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setSelectedMarker(null);
-                  popupOverlayRef.current.setPosition(undefined);
-                }}
-              />
-              <strong>📊 Speed Test #{logs.indexOf(selectedMarker) + 1}</strong>
-              {selectedMarker.isAutoTest && <span style={{color: '#3b82f6', fontSize: '12px'}}> 🤖 Auto</span>}
-              <br />
-              <strong>Speed:</strong> {selectedMarker.speed} Mbps<br />
-              <strong>Quality:</strong> {
-                selectedMarker.speed > 50 ? '🟢 Excellent' :
-                selectedMarker.speed > 10 ? '🟡 Good' :
-                selectedMarker.speed > 1 ? '🔴 Poor' : '⚫ Dead Zone'
-              }<br />
-              <strong>Location:</strong><br />
-              Lat: {selectedMarker.latitude.toFixed(6)}<br />
-              Lng: {selectedMarker.longitude.toFixed(6)}<br />
-              {selectedMarker.timestamp && (
-                <>
-                  <strong>Time:</strong> {new Date(selectedMarker.timestamp).toLocaleString()}
-                </>
+
+          <div className="test-history">
+            <h3>Test History</h3>
+            <div className="history-list">
+              {tests.slice().reverse().map((test, index) => (
+                <div key={index} className="test-item">
+                  <div className="speed-value">
+                    {test.speed.toFixed(2)} Mbps
+                  </div>
+                  <div className="test-details">
+                    <div className="test-time">
+                      {new Date(test.timestamp).toLocaleString()}
+                    </div>
+                    <div className="test-location">
+                      📍 {test.location.lat.toFixed(6)}, {test.location.lng.toFixed(6)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {tests.length === 0 && (
+                <div className="no-test">No test history available</div>
               )}
             </div>
-          )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <TestScheduler 
+            onSchedule={handleScheduleTest}
+            onAutoTest={handleAutoTest}
+          />
+
+          <div className="scheduled-tests">
+            <h3>Scheduled Tests</h3>
+            <div className="space-y-4">
+              {scheduledTests.map(schedule => (
+                <div key={schedule.id} className="test-item">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold">
+                        {schedule.type === 'once' 
+                          ? `One-time: ${schedule.config.date} at ${schedule.config.time}`
+                          : `Weekly on ${schedule.config.day} at ${schedule.config.time}`}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Network: {schedule.networkCondition}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleClearSchedule(schedule.id)}
+                      className="text-red-500 hover:text-red-400 transition-colors"
+                    >
+                      ❌
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {scheduledTests.length === 0 && (
+                <p className="text-gray-400">No scheduled tests</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
+};
+
+const getSpeedQuality = (speed) => {
+  const { speedThresholds } = useSettings();
+  if (speed > speedThresholds.excellent) return '🟢 Excellent';
+  if (speed > speedThresholds.good) return '🟡 Good';
+  if (speed > speedThresholds.poor) return '🔴 Poor';
+  return '⚫ Dead Zone';
+};
+
+const getDayNumber = (day) => {
+  const days = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6
+  };
+  return days[day.toLowerCase()];
+};
+
+const getDayDifference = (current, target) => {
+  return (target + 7 - current) % 7;
 };
 
 export default Testing; 

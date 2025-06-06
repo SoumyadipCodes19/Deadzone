@@ -1,29 +1,52 @@
 export const testInternetSpeed = async () => {
-  try {
-    const testFile = "https://speed.cloudflare.com/__down?bytes=10000000";
-    const startTime = performance.now();
-    
-    const response = await fetch(testFile, {
-      method: 'GET',
-      cache: 'no-cache'
-    });
-    
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
+  console.log('Starting speed test...');
+  const testSizes = [
+    25000000,  // 25 MB
+    5000000,   // 5 MB
+    1000000    // 1 MB
+  ];
+
+  for (const size of testSizes) {
+    try {
+      console.log(`Testing with size: ${size} bytes`);
+      const startTime = performance.now();
+      
+      console.log('Fetching...');
+      const response = await fetch(`http://localhost:3001/speedtest?size=${size}`, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      
+      if (!response.ok) {
+        console.warn(`Failed to fetch test data: ${response.status}`);
+        continue;
+      }
+      
+      console.log('Reading response...');
+      const blob = await response.blob();
+      const endTime = performance.now();
+      
+      console.log(`Response size: ${blob.size} bytes`);
+      const duration = (endTime - startTime) / 1000; // Convert to seconds
+      console.log(`Test duration: ${duration} seconds`);
+      
+      const fileSizeInBits = blob.size * 8;
+      const speedMbps = (fileSizeInBits / duration) / (1024 * 1024);
+      console.log(`Calculated speed: ${speedMbps} Mbps`);
+      
+      // Validate the result
+      if (speedMbps > 0 && speedMbps < 10000) { // Reasonable range check
+        console.log(`Returning valid speed: ${Math.round(speedMbps * 100) / 100} Mbps`);
+        return Math.round(speedMbps * 100) / 100; // Round to 2 decimal places
+      }
+      
+      console.warn(`Invalid speed result: ${speedMbps}`);
+    } catch (error) {
+      console.error(`Error during speed test:`, error);
     }
-    
-    await response.blob();
-    const endTime = performance.now();
-    
-    const duration = (endTime - startTime) / 1000;
-    const fileSizeInBits = 10 * 1024 * 1024 * 8;
-    const speedMbps = (fileSizeInBits / duration) / (1024 * 1024);
-    
-    return Math.max(0.1, Number(speedMbps.toFixed(2)));
-  } catch (error) {
-    console.error('Speed test failed:', error);
-    return 0.1;
   }
+  
+  throw new Error('All speed test attempts failed');
 };
 
 export const getLocation = () =>

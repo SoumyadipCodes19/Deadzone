@@ -1,10 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useSettings } from '../context/SettingsContext';
 
 const useSpeedTest = (onTestComplete) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isAutoTesting, setIsAutoTesting] = useState(false);
   const [autoTestCount, setAutoTestCount] = useState(0);
+  const { autoTestInterval } = useSettings();
   const workerRef = useRef(null);
 
   // Initialize Web Worker
@@ -43,7 +45,7 @@ const useSpeedTest = (onTestComplete) => {
   }, [onTestComplete]);
 
   // Start auto testing
-  const startAutoTest = useCallback((interval) => {
+  const startAutoTest = useCallback((interval = autoTestInterval * 1000) => {
     if (isAutoTesting) return;
     
     setIsAutoTesting(true);
@@ -58,55 +60,43 @@ const useSpeedTest = (onTestComplete) => {
     // Save auto-test state
     localStorage.setItem('autoTestingActive', 'true');
     localStorage.setItem('autoTestInterval', interval.toString());
-  }, [isAutoTesting]);
+  }, [isAutoTesting, autoTestInterval]);
 
   // Stop auto testing
   const stopAutoTest = useCallback(() => {
     if (!isAutoTesting) return;
 
-    setIsAutoTesting(false);
-    console.log('Stopping auto test...');
-    workerRef.current.postMessage({ command: 'stop' });
+    workerRef.current.postMessage({
+      command: 'stop'
+    });
 
-    // Clear auto-test state
+    setIsAutoTesting(false);
     localStorage.removeItem('autoTestingActive');
     localStorage.removeItem('autoTestInterval');
   }, [isAutoTesting]);
 
-  // Update test interval
-  const updateTestInterval = useCallback((interval) => {
-    if (workerRef.current) {
-      workerRef.current.postMessage({
-        command: 'setInterval',
-        data: { interval }
-      });
-
-      if (isAutoTesting) {
-        localStorage.setItem('autoTestInterval', interval.toString());
-      }
-    }
-  }, [isAutoTesting]);
-
-  // Run a single manual test
+  // Run a manual test
   const runManualTest = useCallback(async () => {
+    if (isLoading) return;
+
     setIsLoading(true);
     setError(null);
 
     try {
+      // Get current position
       const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
+        navigator.geolocation.getCurrentPosition(resolve, reject);
       });
 
+      // Simulate speed test (replace with actual speed test logic)
+      const speed = Math.random() * 100;
+
+      // Create test result
       const testResult = {
+        timestamp: new Date().toISOString(),
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
-        speed: await testInternetSpeed(),
-        timestamp: new Date().toISOString(),
-        accuracy: position.coords.accuracy,
+        speed,
         isAutoTest: false
       };
 
@@ -119,14 +109,14 @@ const useSpeedTest = (onTestComplete) => {
     } finally {
       setIsLoading(false);
     }
-  }, [onTestComplete]);
+  }, [isLoading, onTestComplete]);
 
-  // Restore auto-test state on mount
+  // Check for saved auto-test state on mount
   useEffect(() => {
-    const wasAutoTesting = localStorage.getItem('autoTestingActive') === 'true';
-    const savedInterval = parseInt(localStorage.getItem('autoTestInterval'), 10);
+    const autoTestingActive = localStorage.getItem('autoTestingActive') === 'true';
+    const savedInterval = parseInt(localStorage.getItem('autoTestInterval'));
 
-    if (wasAutoTesting && savedInterval) {
+    if (autoTestingActive && savedInterval) {
       startAutoTest(savedInterval);
     }
   }, [startAutoTest]);
@@ -138,26 +128,60 @@ const useSpeedTest = (onTestComplete) => {
     autoTestCount,
     startAutoTest,
     stopAutoTest,
-    updateTestInterval,
     runManualTest
   };
 };
 
 // Helper function to test internet speed
 async function testInternetSpeed() {
-  try {
-    const startTime = performance.now();
-    const response = await fetch('https://www.google.com/favicon.ico', {
-      cache: 'no-store'
-    });
-    if (!response.ok) throw new Error('Network response was not ok');
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    const speed = (response.headers.get('content-length') * 8) / (duration / 1000) / 1024 / 1024;
-    return Math.min(Math.round(speed * 100) / 100, 1000); // Cap at 1000 Mbps
-  } catch (error) {
-    return 0; // Return 0 for failed tests
+  console.log('Starting speed test...');
+  const testSizes = [
+    25000000,  // 25 MB
+    5000000,   // 5 MB
+    1000000    // 1 MB
+  ];
+
+  for (const size of testSizes) {
+    try {
+      console.log(`Testing with size: ${size} bytes`);
+      const startTime = performance.now();
+      
+      console.log('Fetching...');
+      const response = await fetch(`http://localhost:3001/speedtest?size=${size}`, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      
+      if (!response.ok) {
+        console.warn(`Failed to fetch test data: ${response.status}`);
+        continue;
+      }
+      
+      console.log('Reading response...');
+      const blob = await response.blob();
+      const endTime = performance.now();
+      
+      console.log(`Response size: ${blob.size} bytes`);
+      const duration = (endTime - startTime) / 1000; // Convert to seconds
+      console.log(`Test duration: ${duration} seconds`);
+      
+      const fileSizeInBits = blob.size * 8;
+      const speedMbps = (fileSizeInBits / duration) / (1024 * 1024);
+      console.log(`Calculated speed: ${speedMbps} Mbps`);
+      
+      // Validate the result
+      if (speedMbps > 0 && speedMbps < 10000) { // Reasonable range check
+        console.log(`Returning valid speed: ${Math.round(speedMbps * 100) / 100} Mbps`);
+        return Math.round(speedMbps * 100) / 100; // Round to 2 decimal places
+      }
+      
+      console.warn(`Invalid speed result: ${speedMbps}`);
+    } catch (error) {
+      console.error(`Error during speed test:`, error);
+    }
   }
+  
+  return 0; // Return 0 for failed tests in hook context
 }
 
 export default useSpeedTest; 
