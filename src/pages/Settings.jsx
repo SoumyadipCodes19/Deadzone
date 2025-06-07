@@ -5,10 +5,6 @@ import '../styles/Settings.css';
 const Settings = () => {
   const { settings, updateSettings } = useContext(SettingsContext);
 
-  const handleThemeChange = (e) => {
-    updateSettings({ ...settings, theme: e.target.value });
-  };
-
   const handleAccentColorChange = (e) => {
     updateSettings({ ...settings, accentColor: e.target.value });
   };
@@ -22,8 +18,10 @@ const Settings = () => {
   };
 
   const handleSpeedThresholdChange = (type, value) => {
-    const newValue = parseInt(value);
-    if (isNaN(newValue)) return;
+    // Allow empty string or valid numbers
+    const newValue = value === '' ? '' : parseInt(value);
+    // Only validate if it's a number
+    if (value !== '' && isNaN(newValue)) return;
 
     updateSettings({
       ...settings,
@@ -48,22 +46,6 @@ const Settings = () => {
       <div className="settings-grid">
         <div className="settings-card">
           <h2>🎨 Theme Customization</h2>
-          <div className="settings-section">
-            <h3>Theme Mode</h3>
-            <p>Choose your preferred color theme</p>
-            <div className="form-group">
-              <select 
-                className="form-select"
-                value={settings.theme}
-                onChange={handleThemeChange}
-              >
-                <option value="system">System Default</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </div>
-          </div>
-
           <div className="settings-section">
             <h3>Accent Color</h3>
             <p>Select a custom accent color</p>
@@ -138,6 +120,7 @@ const Settings = () => {
                   max="1000"
                   value={settings.speedThresholds.excellent}
                   onChange={(e) => handleSpeedThresholdChange('excellent', e.target.value)}
+                  placeholder="Enter threshold"
                 />
                 <div className="threshold-badge excellent">🟢</div>
               </div>
@@ -150,6 +133,7 @@ const Settings = () => {
                   max="1000"
                   value={settings.speedThresholds.good}
                   onChange={(e) => handleSpeedThresholdChange('good', e.target.value)}
+                  placeholder="Enter threshold"
                 />
                 <div className="threshold-badge good">🟡</div>
               </div>
@@ -162,16 +146,43 @@ const Settings = () => {
                   max="1000"
                   value={settings.speedThresholds.poor}
                   onChange={(e) => handleSpeedThresholdChange('poor', e.target.value)}
+                  placeholder="Enter threshold"
                 />
                 <div className="threshold-badge poor">🟠</div>
               </div>
               <div className="threshold-input">
-                <label>Dead Zone (Below Poor)</label>
-                <div className="threshold-value">
-                  {settings.speedThresholds.poor} Mbps and below
-                </div>
+                <label>Dead Zone (Below)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  min="0"
+                  max="1000"
+                  value={settings.speedThresholds.poor}
+                  onChange={(e) => handleSpeedThresholdChange('poor', e.target.value)}
+                  placeholder="Enter threshold"
+                  disabled
+                />
                 <div className="threshold-badge dead">⚫</div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-card">
+          <h2>📄 Report Preferences</h2>
+          <div className="settings-section">
+            <h3>Default Export Format</h3>
+            <p>Choose the default file format for exporting reports</p>
+            <div className="form-group">
+              <select 
+                className="form-select"
+                value={settings.defaultReportFormat}
+                onChange={(e) => updateSettings({ ...settings, defaultReportFormat: e.target.value })}
+              >
+                <option value="json">JSON</option>
+                <option value="pdf">PDF</option>
+                <option value="csv">CSV</option>
+              </select>
             </div>
           </div>
         </div>

@@ -4,7 +4,7 @@ const SettingsContext = createContext();
 
 // Default values for settings
 const DEFAULT_SETTINGS = {
-  theme: 'system',
+  theme: 'dark', // Always dark theme
   accentColor: '#3b82f6',
   defaultMapStyle: 'Streets',
   defaultZoom: 13,
@@ -12,7 +12,8 @@ const DEFAULT_SETTINGS = {
     excellent: 80, // Above 80 Mbps is excellent
     good: 40,      // 40-80 Mbps is good
     poor: 10       // 10-40 Mbps is poor, below 10 is dead zone
-  }
+  },
+  defaultReportFormat: 'json' // Default report format
 };
 
 // Settings storage key

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronUpIcon, SignalIcon } from '@heroicons/react/24/outline';
 import '../styles/Home.css';
 
 const Home = () => {
@@ -82,7 +82,10 @@ const Home = () => {
     <div className="manual-container">
       <div className="manual-content">
         <div className="manual-header">
-          <h1 className="manual-title">DeadZone User Manual</h1>
+          <h1 className="manual-title">
+            <SignalIcon className="title-icon" />
+            DeadZone User Manual
+          </h1>
           <p className="manual-subtitle">
             Everything you need to know about using DeadZone effectively
           </p>

@@ -227,18 +227,34 @@
 
 .threshold-input input {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.5rem 1rem;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--input-bg);
+  border-radius: 8px;
+  background: var(--bg-primary);
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+/* Remove default number input spinners */
+.threshold-input input[type="number"]::-webkit-inner-spin-button,
+.threshold-input input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.threshold-input input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+}
+
+.threshold-input input:hover {
+  border-color: var(--primary-color);
 }
 
 .threshold-input input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px var(--primary-color-alpha);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 .threshold-value {

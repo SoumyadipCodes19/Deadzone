@@ -129,9 +129,12 @@ const Testing = () => {
 
   return (
     <div className="testing-page">
-      <div className="testing-header">
-        <div className="flex justify-between items-center">
-          <h1>Network Testing</h1>
+      <div className="page-header">
+        <h1>Network Testing</h1>
+      </div>
+
+      <div className="testing-grid">
+        <div className="flex flex-col gap-6">
           <div className="testing-controls">
             <button 
               className="btn btn-primary"
@@ -156,11 +159,7 @@ const Testing = () => {
               🗑️ Clear Tests
             </button>
           </div>
-        </div>
-      </div>
 
-      <div className="testing-grid">
-        <div className="flex flex-col gap-6">
           <div className="test-status">
             <h3>Current Status</h3>
             {tests.length === 0 ? (

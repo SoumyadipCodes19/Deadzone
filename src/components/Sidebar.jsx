@@ -6,7 +6,8 @@ import {
   CogIcon,
   BeakerIcon,
   MapIcon,
-  DocumentChartBarIcon
+  DocumentChartBarIcon,
+  SignalIcon
 } from '@heroicons/react/24/outline';
 import '../styles/main.css';
 
@@ -25,6 +26,7 @@ const Sidebar = () => {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
+        <SignalIcon className="nav-icon" />
         <h1>DeadZone</h1>
       </div>
       <div className="sidebar-content">

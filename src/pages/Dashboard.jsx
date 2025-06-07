@@ -73,39 +73,9 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="dashboard">
-      <div className="dashboard-header">
+    <div className="dashboard-page">
+      <div className="page-header">
         <h1>Dashboard</h1>
-        <div className="dashboard-controls">
-          <div className="time-range-controls">
-            <button 
-              className={`btn ${timeRange === '24h' ? 'active' : ''}`}
-              onClick={() => handleTimeRangeChange('24h')}
-            >
-              24 Hours
-            </button>
-            <button 
-              className={`btn ${timeRange === '7d' ? 'active' : ''}`}
-              onClick={() => handleTimeRangeChange('7d')}
-            >
-              7 Days
-            </button>
-            <button 
-              className={`btn ${timeRange === '30d' ? 'active' : ''}`}
-              onClick={() => handleTimeRangeChange('30d')}
-            >
-              30 Days
-            </button>
-          </div>
-          {selectedTests.size > 0 && (
-            <button 
-              className="btn btn-danger"
-              onClick={handleDeleteSelected}
-            >
-              Delete Selected ({selectedTests.size})
-            </button>
-          )}
-        </div>
       </div>
 
       <div className="dashboard-grid">
@@ -211,7 +181,7 @@ const Dashboard = () => {
             <h2>📅 Test Schedule</h2>
           </div>
           <div className="card-content">
-            <TestSchedule scheduledTests={[]} /> {/* TODO: Get scheduled tests from context */}
+            <TestSchedule scheduledTests={[]} />
           </div>
         </div>
 

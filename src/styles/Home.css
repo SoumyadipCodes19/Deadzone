@@ -19,6 +19,15 @@
   font-weight: 600;
   color: #ffffff;
   margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.title-icon {
+  width: 2rem;
+  height: 2rem;
+  color: #3b82f6;
 }
 
 .manual-subtitle {

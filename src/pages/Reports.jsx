@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useCoverage } from '../context/CoverageContext';
+import { useSettings } from '../context/SettingsContext';
 import Button from '../components/common/Button';
 import ConfirmDialog from '../components/common/ConfirmDialog';
+import { jsPDF } from 'jspdf/dist/jspdf.es.min.js';
+import autoTable from 'jspdf-autotable';
 import '../styles/Reports.css';
 
 const ReportPreview = ({ report, onClose }) => {
@@ -221,6 +224,7 @@ const ReportPreview = ({ report, onClose }) => {
 
 const Reports = () => {
   const { reports, generateReport, deleteReport, clearAllReports } = useCoverage();
+  const { settings } = useSettings();
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -288,12 +292,138 @@ const Reports = () => {
   };
 
   const handleDownload = (report) => {
-    const dataStr = JSON.stringify(report.data);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', `${report.title}.json`);
-    linkElement.click();
+    const format = settings.defaultReportFormat;
+    const reportTitle = report.title.replace(/[^a-zA-Z0-9]/g, '_');
+
+    switch (format) {
+      case 'csv': {
+        let csvContent = '';
+        
+        // Add report title and timestamp
+        csvContent += `${report.title}\n`;
+        csvContent += `Generated on: ${new Date(report.date).toLocaleString()}\n\n`;
+
+        if (report.type === 'coverage') {
+          // Headers for coverage report
+          csvContent += 'Location,Speed (Mbps),Signal Quality,Timestamp\n';
+          
+          // Data rows for coverage points
+          report.data.coverage.forEach(point => {
+            const quality = point.speed > report.data.statistics.excellent ? 'Excellent' :
+                          point.speed > report.data.statistics.good ? 'Good' :
+                          point.speed > report.data.statistics.poor ? 'Poor' : 'Dead Zone';
+            
+            csvContent += `"${point.lat},${point.lng}",${point.speed.toFixed(2)},"${quality}","${new Date(point.timestamp).toLocaleString()}"\n`;
+          });
+
+          // Add statistics
+          csvContent += '\nStatistics\n';
+          csvContent += `Excellent Signal Areas,${report.data.statistics.excellentSignal}\n`;
+          csvContent += `Good Signal Areas,${report.data.statistics.goodSignal}\n`;
+          csvContent += `Poor Signal Areas,${report.data.statistics.poorSignal}\n`;
+          csvContent += `Dead Zones,${report.data.statistics.deadZones}\n`;
+        } else {
+          // For other report types, convert the data structure to CSV
+          Object.entries(report.data).forEach(([key, value]) => {
+            if (typeof value === 'object') {
+              csvContent += `\n${key.toUpperCase()}\n`;
+              Object.entries(value).forEach(([subKey, subValue]) => {
+                csvContent += `${subKey},${subValue}\n`;
+              });
+            } else {
+              csvContent += `${key},${value}\n`;
+            }
+          });
+        }
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${reportTitle}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        break;
+      }
+
+      case 'pdf': {
+        const doc = new jsPDF();
+        
+        // Set title
+        doc.setFontSize(20);
+        doc.text(report.title, 20, 20);
+        
+        // Add timestamp
+        doc.setFontSize(12);
+        doc.text(`Generated on: ${new Date(report.date).toLocaleString()}`, 20, 30);
+
+        if (report.type === 'coverage') {
+          // Add statistics table
+          doc.autoTable({
+            startY: 40,
+            head: [['Coverage Statistics', 'Count']],
+            body: [
+              ['Excellent Signal Areas', report.data.statistics.excellentSignal],
+              ['Good Signal Areas', report.data.statistics.goodSignal],
+              ['Poor Signal Areas', report.data.statistics.poorSignal],
+              ['Dead Zones', report.data.statistics.deadZones]
+            ],
+          });
+
+          // Add coverage points table
+          const coverageData = report.data.coverage.map(point => [
+            `${point.lat}, ${point.lng}`,
+            point.speed.toFixed(2),
+            point.speed > report.data.statistics.excellent ? 'Excellent' :
+            point.speed > report.data.statistics.good ? 'Good' :
+            point.speed > report.data.statistics.poor ? 'Poor' : 'Dead Zone',
+            new Date(point.timestamp).toLocaleString()
+          ]);
+
+          doc.autoTable({
+            startY: doc.previousAutoTable.finalY + 10,
+            head: [['Location', 'Speed (Mbps)', 'Signal Quality', 'Timestamp']],
+            body: coverageData,
+          });
+        } else {
+          // For other report types
+          const tableData = [];
+          Object.entries(report.data).forEach(([key, value]) => {
+            if (typeof value === 'object') {
+              tableData.push([{ content: key.toUpperCase(), colSpan: 2, styles: { fontStyle: 'bold' } }]);
+              Object.entries(value).forEach(([subKey, subValue]) => {
+                tableData.push([subKey, subValue]);
+              });
+            } else {
+              tableData.push([key, value]);
+            }
+          });
+
+          doc.autoTable({
+            startY: 40,
+            head: [['Property', 'Value']],
+            body: tableData,
+          });
+        }
+
+        doc.save(`${reportTitle}.pdf`);
+        break;
+      }
+
+      default: { // json
+        const blob = new Blob([JSON.stringify(report.data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${reportTitle}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    }
   };
 
   const handleViewReport = (report) => {
@@ -310,7 +440,7 @@ const Reports = () => {
             <div className="report-type-row">
               <select 
                 id="report-type"
-                className="select-input"
+                className="form-select"
                 value={selectedReportType}
                 onChange={(e) => setSelectedReportType(e.target.value)}
               >
@@ -349,7 +479,7 @@ const Reports = () => {
             placeholder="Search reports..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
+            className="form-input"
           />
         </div>
       </div>
