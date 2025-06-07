@@ -1,117 +1,118 @@
-# DeadZone Web App
+# DeadZone Web - Network Coverage Mapping Application
 
-Track and visualize internet connectivity zones with real-time speed testing and mapping.
+## Overview
+DeadZone Web is a modern web application designed to map and analyze network coverage dead zones. It helps users identify areas with poor network connectivity and provides detailed analysis of network performance across different geographical locations.
 
-## Features
+## 🌟 Features
+- Interactive network coverage mapping
+- Real-time speed testing functionality
+- Detailed network performance analytics
+- Data visualization using Recharts
+- Map integration with Leaflet
+- PDF report generation
+- Responsive design for all devices
+- Date-based data filtering and analysis
 
-- 🌍 Interactive Map Visualization
-  - Multiple map styles (Dark/Streets/Satellite)
-  - Custom markers with speed indicators
-  - Heatmap visualization
-  - Auto-centering on new tests
-  - Click markers for detailed information
+## 🛠️ Tech Stack
+### Frontend
+- React.js
+- Vite (Build tool)
+- Tailwind CSS (Styling)
+- React Router (Navigation)
+- Leaflet/OpenLayers (Mapping)
+- Recharts (Data visualization)
+- jsPDF (PDF generation)
+- Heroicons (Icons)
 
-- 📊 Speed Testing
-  - Manual speed testing
-  - Automated background testing
-  - Configurable test intervals
-  - Persistent test history
-  - Accurate geolocation tracking
+### Backend
+- Node.js
+- Express.js
+- CORS support
+- Crypto (for speed test data generation)
 
-- 📱 User Experience
-  - Dark mode interface
-  - Responsive design
-  - Real-time updates
-  - Offline support
-  - Background testing
+## 📋 Prerequisites
+- Node.js (v14 or higher)
+- npm (v6 or higher)
 
-- 📈 Data Management
-  - Local storage persistence
-  - Export functionality
-  - Statistical analysis
-  - Coverage visualization
-  - Trend tracking
+## 🚀 Getting Started
 
-## Getting Started
+### Local Development Setup
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/deadzone-web.git
-   cd deadzone-web
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-## Project Structure
-
-```
-src/
-├── components/          # Reusable UI components
-│   ├── map/            # Map-related components
-│   └── common/         # Common UI elements
-├── hooks/              # Custom React hooks
-├── workers/            # Web Workers for background tasks
-├── utils/             # Utility functions
-└── pages/             # Main application pages
+1. Clone the repository
+```bash
+git clone https://github.com/yourusername/deadzone-web.git
+cd deadzone-web
 ```
 
-## Components
+2. Install dependencies
+```bash
+npm install
+```
 
-### MapContainer
-The main map component that handles:
-- Map initialization
-- Layer management
-- Marker rendering
-- Style switching
+3. Start the development server
+```bash
+npm run dev
+```
+This will concurrently run:
+- Backend server on http://localhost:3001
+- Frontend development server on http://localhost:5173
 
-### Speed Testing
-Handles internet speed testing with:
-- Manual testing
-- Automated background testing
-- Geolocation tracking
-- Result persistence
+### Production Build
 
-## Hooks
+1. Create a production build
+```bash
+npm run build
+```
 
-### useMapMarkers
-Custom hook for managing map markers:
-- Add/remove markers
-- Style markers
-- Handle marker animations
-- Manage marker clustering
+2. Preview the production build
+```bash
+npm run serve
+```
 
-### useSpeedTest
-Custom hook for speed testing:
-- Run manual tests
-- Manage auto-testing
-- Handle test intervals
-- Persist test results
+## 🌐 Deployment
+The application is deployed on Vercel. The production version can be accessed at:
+https://deadzone-soumyadipcodes19s-projects.vercel.app/
 
-## Web Workers
+### Analytics
+The application is integrated with Vercel Analytics to track:
+- Page views
+- Visitor counts
+- Bounce rates
+- Geographic distribution
+- Device information
+- Browser statistics
+- Custom events (Pro feature)
 
-### speedTestWorker
-Handles background speed testing:
-- Runs tests in background
-- Manages test intervals
-- Reports results to main thread
-- Handles geolocation
+### Environment Variables
+Make sure to set up the following environment variables in your Vercel deployment:
+- `VITE_API_URL`: Your backend API URL
+- Add any other environment variables your application needs
 
-## Contributing
+## 📝 API Endpoints
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+### Speed Test
+- `GET /speedtest?size=<bytes>`: Performs network speed test
+  - Query parameter: size (default: 25MB)
+  - Returns: Random data of specified size for testing
 
-## License
+### Health Check
+- `GET /health`: Server health check endpoint
+  - Returns: Server status message
 
+## 🔧 Configuration
+- Frontend configuration can be modified in `vite.config.js`
+- Tailwind CSS configuration in `tailwind.config.js`
+- Backend server configuration in `server.js`
+
+## 🤝 Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🐛 Known Issues
+- List any known issues or limitations here
+- Add workarounds if available
+
+## 📞 Support
+For support, please open an issue in the GitHub repository or contact the maintainers.
